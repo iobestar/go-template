@@ -3,9 +3,10 @@ package template
 import (
 	"bytes"
 	"context"
-	"github.com/pkg/errors"
 	"io"
 	"os/exec"
+
+	"github.com/pkg/errors"
 )
 
 type Command struct {

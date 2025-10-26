@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"github.com/iobestar/go-template"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
+
+	"github.com/iobestar/go-template"
+	"github.com/spf13/cobra"
 )
 
 func newCreateCmd() *baseCmd {

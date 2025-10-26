@@ -3,14 +3,15 @@ package database
 import (
 	"embed"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"io"
-	"os"
-	"path/filepath"
 )
 
 type EmbedMigrationDriver struct {

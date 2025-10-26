@@ -3,13 +3,6 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	"github.com/iobestar/go-template/go-service/internal"
-	"github.com/iobestar/go-template/go-service/internal/app"
-	"github.com/iobestar/go-template/go-service/internal/logging"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	slog "log"
 	"net"
 	"net/http"
@@ -18,11 +11,19 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+
+	"github.com/iobestar/go-template/go-service/internal"
+	"github.com/iobestar/go-template/go-service/internal/app"
+	"github.com/iobestar/go-template/go-service/internal/logging"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const name = "template"
 
-var _ http.Handler = app.App(nil)
+var _ http.Handler = internal.HttpApp(nil)
 
 func Start(cmd *cobra.Command, version, build string) error {
 	defer func() {
@@ -61,14 +62,7 @@ func Start(cmd *cobra.Command, version, build string) error {
 	}
 	log.WithFields(logFields).Info("starting " + name)
 
-	errorWriter := logging.NewLevelWriter(log.ErrorLevel)
-	defer func() {
-		if err := errorWriter.Close(); nil != err {
-			log.WithError(err).Warn("error closing error writer")
-		}
-	}()
-
-	a, err := app.New()
+	a, err := app.NewHttp()
 	if nil != err {
 		return err
 	}
@@ -81,6 +75,13 @@ func Start(cmd *cobra.Command, version, build string) error {
 	if err != nil {
 		return err
 	}
+
+	errorWriter := logging.NewLevelWriter(log.ErrorLevel)
+	defer func() {
+		if err := errorWriter.Close(); nil != err {
+			log.WithError(err).Warn("error closing error writer")
+		}
+	}()
 
 	httpS := &http.Server{
 		Handler:  a,

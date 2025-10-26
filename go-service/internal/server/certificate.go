@@ -4,10 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	_ "embed"
+	"sync"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"sync"
 )
 
 type CertificateLoader interface {

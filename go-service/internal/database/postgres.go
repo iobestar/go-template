@@ -2,11 +2,12 @@ package database
 
 import (
 	"fmt"
+	"strings"
+
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/spf13/viper"
-	"strings"
 )
 
 func init() {

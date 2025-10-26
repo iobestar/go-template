@@ -2,9 +2,10 @@ package template
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/mattn/go-tty"
 	"github.com/pkg/errors"
-	"strings"
 )
 
 type InputOptions struct {

@@ -2,16 +2,17 @@ package logging
 
 import (
 	"fmt"
-	"github.com/iobestar/go-template/go-service/internal"
-	"github.com/natefinch/lumberjack"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path"
 	"runtime"
 	"time"
+
+	"github.com/iobestar/go-template/go-service/internal"
+	"github.com/natefinch/lumberjack"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/sirupsen/logrus"
 )
 
 var (

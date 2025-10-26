@@ -1,0 +1,26 @@
+{{ define "base"}}
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{block "title" .}}My Web App{{end}}</title>
+
+        {{block "head" .}}{{end}}
+    </head>
+    <body>
+    <header>
+        <h1>Site Header</h1>
+    </header>
+    <main>
+        {{block "main" .}}{{end}}
+    </main>
+    <footer>
+        <p>{{ block "footer" .}}&copy; 2025{{end}}</p>
+    </footer>
+    {{ block "scripts" .}}
+        <script src="/static/js/index.js"></script>
+    {{end}}
+    </body>
+    </html>
+{{ end }}

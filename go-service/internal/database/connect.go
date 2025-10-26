@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
