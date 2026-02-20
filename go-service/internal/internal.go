@@ -48,19 +48,3 @@ type Starter interface {
 	Start() error
 	Stop() error
 }
-
-type ExitError struct {
-	error
-	exitCode int
-}
-
-func NewExitError(err error, exitCode int) error {
-	return &ExitError{
-		error:    err,
-		exitCode: exitCode,
-	}
-}
-
-func (e *ExitError) ExitCode() int {
-	return e.exitCode
-}

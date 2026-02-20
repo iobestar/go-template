@@ -43,22 +43,20 @@ type AppComponent struct {
 }
 
 type defaultContainer struct {
-	componentsByName map[string]AppComponent
-	componentsByType map[reflect.Type][]AppComponent
-
-	mux sync.RWMutex
+	componentsByName LinkedMap[string, AppComponent]
 
 	disposer Disposer
+
+	mux sync.RWMutex
 }
 
 func NewAppContainer() AppContainer {
 	return &defaultContainer{
-		componentsByName: make(map[string]AppComponent),
-		componentsByType: make(map[reflect.Type][]AppComponent),
-
-		mux: sync.RWMutex{},
+		componentsByName: NewLinkedMap[string, AppComponent](),
 
 		disposer: NewDisposer(),
+
+		mux: sync.RWMutex{},
 	}
 }
 
@@ -90,18 +88,10 @@ func (c *defaultContainer) registerComponents(components ...AppComponent) error 
 
 	for _, component := range components {
 		name := component.Name
-		if _, exists := c.componentsByName[name]; exists {
+		if !c.componentsByName.Contains(name) {
+			c.componentsByName.Put(name, component)
+		} else {
 			return errors.New(fmt.Sprintf("component already exists: %s", name))
-		} else {
-			c.componentsByName[name] = component
-		}
-
-		t := reflect.TypeOf(component.Value)
-
-		if values, exists := c.componentsByType[t]; exists {
-			c.componentsByType[t] = append(values, component)
-		} else {
-			c.componentsByType[t] = []AppComponent{component}
 		}
 	}
 	return nil
@@ -109,21 +99,13 @@ func (c *defaultContainer) registerComponents(components ...AppComponent) error 
 
 // collectAndSortStarters returns all Starter components sorted by Order.
 func (c *defaultContainer) collectAndSortStarters() []Starter {
-	components := make([]AppComponent, 0, len(c.componentsByType))
-	for _, component := range c.componentsByName {
-		components = append(components, component)
-	}
-
+	components := c.componentsByName.Values()
 	return filterAndSortComponentsByType[Starter](components)
 }
 
 // collectAndSortRunners returns all Runner components sorted by Order.
 func (c *defaultContainer) collectAndSortRunners() []Runner {
-	components := make([]AppComponent, 0, len(c.componentsByType))
-	for _, component := range c.componentsByName {
-		components = append(components, component)
-	}
-
+	components := c.componentsByName.Values()
 	return filterAndSortComponentsByType[Runner](components)
 }
 
@@ -150,14 +132,13 @@ func (c *defaultContainer) Stop() error {
 			return fmt.Errorf("failed to stop component: %w", err)
 		}
 	}
-
 	c.disposer.Dispose()
 	return nil
 }
 
 func (c *defaultContainer) Run(ctx context.Context, wg *sync.WaitGroup, disposer Disposer) error {
-	c.mux.Lock()
-	defer c.mux.Unlock()
+	c.mux.RLock()
+	defer c.mux.RUnlock()
 
 	for _, runner := range c.collectAndSortRunners() {
 		if err := runner.Run(ctx, wg, disposer); nil != err {
@@ -171,7 +152,7 @@ func (c *defaultContainer) GetByName(name string) (any, bool) {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
 
-	if component, ok := c.componentsByName[name]; ok {
+	if component, ok := c.componentsByName.Get(name); ok {
 		return component.Value, true
 	}
 	return nil, false
@@ -182,17 +163,12 @@ func (c *defaultContainer) GetAllByType(t reflect.Type) []any {
 	defer c.mux.RUnlock()
 
 	result := make([]any, 0)
-	if components, ok := c.componentsByType[t]; ok {
-		for _, component := range components {
-			result = append(result, component.Value)
-		}
-	}
-
-	for _, component := range c.componentsByName {
+	c.componentsByName.Range(func(_ string, component AppComponent) bool {
 		if reflect.TypeOf(component.Value).AssignableTo(t) {
 			result = append(result, component.Value)
 		}
-	}
+		return true
+	})
 	return result
 }
 
@@ -214,9 +190,9 @@ func (c *defaultContainer) MustGetByName(name string) any {
 func (c *defaultContainer) MustGetByType(t reflect.Type) any {
 	if component, ok := c.GetByType(t); ok {
 		return component
-	} else {
-		panic(fmt.Sprintf("component not found for type: %s", t.String()))
 	}
+
+	panic(fmt.Sprintf("component not found for type: %s", t.String()))
 }
 
 func filterAndSortComponentsByType[T any](components []AppComponent) []T {
