@@ -6,49 +6,63 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/pkg/errors"
 )
 
 type output struct {
 	writer io.Writer
-	format string
 }
 
-func newStdOutput() *output {
+func (o *output) Write(p []byte) (n int, err error) {
+	return o.writer.Write(p)
+}
+
+func newOutput(w io.Writer) *output {
+	return &output{
+		writer: w,
+	}
+}
+
+func newStdout() *output {
 	return newOutput(os.Stdout)
 }
 
-func newOutput(writer io.Writer) *output {
-	return &output{
-		writer: writer,
-	}
+func newStderr() *output {
+	return newOutput(os.Stderr)
 }
 
 type writeFunc func(w io.Writer, a ...any) (n int, err error)
 
-func (o *output) write(w writeFunc, value any) error {
+func (o *output) write(value any, w writeFunc) error {
 	if nil == value {
 		return nil
 	}
 
 	if err, ok := value.(error); ok {
-		var exitError *ExitError
-		if errors.As(err, &exitError) {
-			if _, err := w(o.writer, fmt.Sprintf("ERROR: %s", err.Error())); nil != err {
-				return err
-			}
-			os.Exit(exitError.exitCode)
-		}
-
-		if _, err := w(o.writer, fmt.Sprintf("ERROR: %s", err.Error())); nil != err {
-			return err
-		}
-		return nil
+		_, err := w(o.writer, fmt.Sprintf("ERROR: %s", err.Error()))
+		return err
 	}
 
 	_, err := w(o.writer, fmt.Sprintf("%v", value))
 	return err
+}
+func Write(value interface{}) error {
+	return newStdout().write(value, fmt.Fprint)
+}
+
+func MustWrite(value interface{}) {
+	if err := Write(value); nil != err {
+		Fatal(err, 1)
+	}
+}
+
+func Writeln(value interface{}) error {
+	return newStdout().write(value, fmt.Fprintln)
+}
+
+func MustWriteln(value interface{}) {
+	if err := Writeln(value); nil != err {
+		Fatal(err, 1)
+	}
 }
 
 func (o *output) writeFormat(w writeFunc, value any) error {
@@ -70,32 +84,15 @@ func (o *output) writeFormat(w writeFunc, value any) error {
 	return err
 }
 
-func Write(value any) {
-	if err := newStdOutput().write(fmt.Fprint, value); nil != err {
-		FatalError(err)
-	}
-}
-
-func Writeln(value any) {
-	if err := newStdOutput().write(fmt.Fprintln, value); nil != err {
-		FatalError(NewExitError(err, 1))
-	}
-}
-
 func WriteFormat(value any) {
-	if err := newStdOutput().writeFormat(fmt.Fprintln, value); nil != err {
-		FatalError(NewExitError(err, 1))
+	if err := newStdout().writeFormat(fmt.Fprintln, value); nil != err {
+		Fatal(err, 1)
 	}
 }
 
-func FatalError(err error) {
-	if _, err := fmt.Fprintf(os.Stdout, "ERROR: %s", err.Error()); nil != err {
-		os.Exit(1)
+func Fatal(err error, code int) {
+	if err := newStdout().write(err, fmt.Fprintln); nil != err {
+		_, _ = fmt.Fprintln(os.Stderr, fmt.Sprintf("FATAL: %s", err.Error()))
 	}
-
-	var exitError *ExitError
-	if errors.As(err, &exitError) {
-		os.Exit(exitError.exitCode)
-	}
-	os.Exit(1)
+	os.Exit(code)
 }

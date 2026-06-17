@@ -2,12 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path"
 	"strings"
 
 	"github.com/iobestar/go-template/go-service/internal"
-	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -70,27 +67,23 @@ func newRootCmd() *rootCmd {
 
 func Execute() error {
 	cobra.OnInitialize(func() {
-		if config := os.Getenv(strings.ToUpper(name) + "_CONFIG"); len(config) > 0 {
-			viper.SetConfigFile(config)
-		} else {
-			homeDir, err := homedir.Dir()
-			if err != nil {
-				internal.FatalError(errors.Wrap(err, "unable to resolve home dir"))
-			}
-			viper.SetConfigName(name + ".yml")
-			viper.SetConfigType("yaml")
-
-			viper.AddConfigPath(".")
-			viper.AddConfigPath(path.Join(homeDir, "."+name))
-		}
 		viper.AutomaticEnv()
 		viper.SetEnvPrefix(name)
+		viper.SetConfigType("yaml")
 		viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+		configFile := viper.GetString("config.file")
+		if len(configFile) > 0 {
+			viper.SetConfigFile(configFile)
+		} else {
+			viper.SetConfigName(name + ".yml")
+			viper.AddConfigPath(".")
+		}
 
 		if err := viper.ReadInConfig(); err != nil {
 			var configFileNotFoundError viper.ConfigFileNotFoundError
 			if !errors.As(err, &configFileNotFoundError) {
-				internal.FatalError(errors.Wrap(err, "unable to read config"))
+				internal.Fatal(err, 1)
 			}
 		}
 	})
