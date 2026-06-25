@@ -1,12 +1,11 @@
-package server
+package internal
 
 import (
 	"context"
 	"crypto/tls"
-	_ "embed"
 	"sync"
+	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -66,49 +65,50 @@ func (c *fileCertificateLoader) LoadAndUpdateCert() error {
 	return nil
 }
 
-// WatchAndReload function will watch certificate files and reload certificate when files are changed.
+const (
+	reloadInterval = 6 * time.Hour
+	retryBackoff   = 5 * time.Minute
+	maxRetries     = 3
+)
+
+// WatchAndReload periodically reloads certificate files every 6 hours.
+// On reload failure, it retries with a fixed 5-minute backoff up to 3 times before
+// falling back to the regular reload interval.
 func (c *fileCertificateLoader) WatchAndReload(ctx context.Context, wg *sync.WaitGroup) error {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-
-	if err := watcher.Add(c.certPath); err != nil {
-		return err
-	}
-	if err := watcher.Add(c.keyPath); err != nil {
-		return err
-	}
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		reloadTimer := time.NewTimer(reloadInterval)
+		defer reloadTimer.Stop()
+
+		logFields := log.Fields{"keyPath": c.keyPath, "certPath": c.certPath}
+		retryCount := 0
+
 		for {
 			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				if event.Op&fsnotify.Write == fsnotify.Write ||
-					event.Op&fsnotify.Create == fsnotify.Create {
-					if err := c.LoadAndUpdateCert(); nil != err {
-						log.WithFields(log.Fields{"keyPath": c.keyPath, "certPath": c.certPath}).WithError(err).Error("error reloading certificate")
+			case <-reloadTimer.C:
+				if err := c.LoadAndUpdateCert(); err != nil {
+					retryCount++
+					if retryCount <= maxRetries {
+						log.WithFields(logFields).WithError(err).Errorf("error reloading certificate, retry %d/%d", retryCount, maxRetries)
+						reloadTimer.Reset(retryBackoff)
 					} else {
-						log.WithFields(log.Fields{"keyPath": c.keyPath, "certPath": c.certPath}).Info("certificate reloaded")
+						log.WithFields(logFields).WithError(err).Error("error reloading certificate, max retries exceeded")
+						retryCount = 0
+						reloadTimer.Reset(reloadInterval)
 					}
-				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
-					if err := watcher.Add(event.Name); err != nil {
-						log.WithField("path", event.Name).WithError(err).Error("error re-watching path")
-					}
+				} else {
+					log.WithFields(logFields).Info("certificate reloaded")
+					retryCount = 0
+					reloadTimer.Reset(reloadInterval)
 				}
 			case <-ctx.Done():
-				if err := watcher.Close(); nil != err {
-					log.WithError(err).Error("error closing certificate watcher")
-				}
+				return
 			}
 		}
 	}()
-	log.WithFields(log.Fields{"keyPath": c.keyPath, "certPath": c.certPath}).Info("started certificate watcher")
+	log.WithFields(log.Fields{"keyPath": c.keyPath, "certPath": c.certPath}).Info("started certificate reload scheduler")
 	return nil
 }
 

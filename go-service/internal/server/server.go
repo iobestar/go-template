@@ -94,7 +94,7 @@ func Start(cmd *cobra.Command, version, build string) error {
 		if len(config.CertPath) > 0 && len(config.KeyPath) > 0 {
 			log.WithFields(log.Fields{"address": config.Address, "cert_path": config.CertPath, "key_path": config.KeyPath}).
 				Info("starting https server")
-			loader, err := NewCertificateLoader(config.CertPath, config.KeyPath)
+			loader, err := internal.NewCertificateLoader(config.CertPath, config.KeyPath)
 			if err != nil {
 				log.WithError(err).Error("unable to create certificate loader")
 				return
@@ -107,7 +107,7 @@ func Start(cmd *cobra.Command, version, build string) error {
 			httpS.TLSConfig = &tls.Config{GetCertificate: loader.GetCertificate}
 
 			log.WithFields(log.Fields{"address": config.Address}).Info("https server started")
-			if err := httpS.ServeTLS(httpL, config.CertPath, config.KeyPath); errors.Is(err, http.ErrServerClosed) {
+			if err := httpS.Serve(tls.NewListener(httpL, httpS.TLSConfig)); errors.Is(err, http.ErrServerClosed) {
 				log.Info("https server stopped")
 			} else if nil != err {
 				log.WithError(err).Error("http server error")
